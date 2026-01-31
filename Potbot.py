@@ -53,9 +53,7 @@ st.sidebar.header("🤖 AI Settings")
 
 # Model selection (OpenAI Models)
 MODELS = {
-    "gpt-4o": "GPT-4o (Smartest, Fast)",
     "gpt-4o-mini": "GPT-4o Mini (Fastest, Cheaper)",
-    "gpt-3.5-turbo": "GPT-3.5 Turbo (Legacy)"
 }
 
 selected_model = st.sidebar.selectbox(
@@ -269,3 +267,4 @@ with st.sidebar:
 streamlit>=1.28.0
 openai>=1.0.0
 """
+
