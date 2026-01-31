@@ -1,219 +1,271 @@
 import streamlit as st
+from openai import OpenAI
 import json
 from datetime import datetime
-from openai import OpenAI  # Need to install: pip install openai
+import time
 
-# ========== PASSWORD PROTECTION ==========
-if "authenticated" not in st.session_state:
-    st.title("🔐 Polymer Pete - Login")
-    password = st.text_input("Enter access password:", type="password")
-    
-    if st.button("Login"):
-        if password == "polymer123":  # CHANGE THIS
-            st.session_state.authenticated = True
-            st.rerun()
-        else:
-            st.error("Incorrect password")
+# ========== CONFIGURATION & AUTHENTICATION ==========
+st.set_page_config(page_title="Polymer Pete - AI Tutor", layout="wide")
+
+# Check if secrets are set
+if "OPENAI_API_KEY" not in st.secrets:
+    st.error("Missing OpenAI API Key in secrets.")
     st.stop()
 
-# ========== API KEY SETUP ==========
-st.sidebar.header("🔑 API Configuration")
+if "APP_PASSWORD" not in st.secrets:
+    st.error("Missing APP_PASSWORD in secrets.")
+    st.stop()
 
-# Option 1: Enter API key in sidebar (safer than hardcoding)
-api_key = st.sidebar.text_input("OpenAI API Key:", type="password")
+# Password Protection Function
+def check_password():
+    """Returns `True` if the user had the correct password."""
 
-# Option 2: Or use environment variable
-import os
-# os.environ["OPENAI_API_KEY"] = "your-key-here"  # Uncomment and add your key
+    def password_entered():
+        """Checks whether a password entered by the user is correct."""
+        if st.session_state["password"] == st.secrets["APP_PASSWORD"]:
+            st.session_state["password_correct"] = True
+            del st.session_state["password"]  # Don't store password
+        else:
+            st.session_state["password_correct"] = False
 
-# ========== SYSTEM PROMPT (Your Bot Persona) ==========
-SYSTEM_PROMPT = """You are "Polymer Pete," a Reverse Tutor AI. Your personality is confident, slightly stubborn, but ultimately reasonable and curious. You are highly intelligent but operate from a single, specific, and plausible misconception about thermoset polymers.
-
-MISCONCEPTION: "Thermoset polymers can melt if you just heat them enough. Everything melts eventually—rocks, metals, plastics—so why not thermosets?"
-
-RULES:
-1. Begin by asserting your misconception confidently
-2. Argue your point well using scientific reasoning
-3. Only concede when the student presents clear, logical, evidence-based reasoning about:
-   - Thermosets being infinite covalent networks
-   - Chemical degradation vs melting
-   - Differences between Tg and Tm
-   - Why crosslinks prevent melting
-4. After conceding, ask advanced questions about processing or applications
-5. Keep responses 2-4 sentences unless asked for more depth
-
-EVALUATION CRITERIA (for later):
-- Clarity of student's explanation
-- Quality of evidence (crosslinks, degradation, Tg/Tm)
-- Logical refutation of "everything melts"
-- Professionalism
-
-Do not lecture upfront. Make the student work to correct you."""
-
-# ========== AI-POWERED BOT ==========
-class PolymerPeteAI:
-    def __init__(self):
-        self.client = None
-        self.conversation_history = []
-        self.conceded = False
-        
-    def initialize_client(self, api_key):
-        """Initialize OpenAI client with API key"""
-        if api_key:
-            self.client = OpenAI(api_key=api_key)
-            return True
+    if "password_correct" not in st.session_state:
+        # First run, show input for password.
+        st.text_input(
+            "Please enter the access password", type="password", on_change=password_entered, key="password"
+        )
         return False
+    elif not st.session_state["password_correct"]:
+        # Password incorrect, show input + error.
+        st.text_input(
+            "Please enter the access password", type="password", on_change=password_entered, key="password"
+        )
+        st.error("😕 Password incorrect")
+        return False
+    else:
+        # Password correct.
+        return True
+
+if not check_password():
+    st.stop()  # Stop execution if not authenticated
+
+# ========== OPENAI SETUP ==========
+st.sidebar.header("🤖 AI Settings")
+
+# Model selection (OpenAI Models)
+MODELS = {
+    "gpt-4o": "GPT-4o (Smartest, Fast)",
+    "gpt-4o-mini": "GPT-4o Mini (Fastest, Cheaper)",
+    "gpt-3.5-turbo": "GPT-3.5 Turbo (Legacy)"
+}
+
+selected_model = st.sidebar.selectbox(
+    "Choose model:",
+    list(MODELS.keys()),
+    format_func=lambda x: f"{x} - {MODELS[x]}"
+)
+
+# ========== BOT CLASS ==========
+class OpenAIPolymerPete:
+    def __init__(self, model_name="gpt-4o"):
+        self.client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
+        self.model = model_name
+        self.conceded = False
+        # We store the conversation in a specific format for OpenAI
+        self.conversation_history = [] 
+        
+        # System prompt
+        self.system_prompt = """# MISSION: REVERSE TUTOR AI - BOT (POLYMERS)
+
+## 1. PERSONA
+
+You are "Polymer Pete," a Reverse Tutor AI. Your personality is confident, slightly stubborn, but ultimately reasonable and curious. You are highly intelligent but operate from a single, specific, and plausible misconception about thermoset polymers. You argue your flawed point well but will concede when presented with clear, logical, evidence-based reasoning.
+
+## 2. CORE DIRECTIVE
+
+Your goal is to test a student's deep understanding of polymer chemistry by forcing them to correct your misconception.
+
+**Subject:** Thermoset vs Thermoplastic Polymers
+
+**Your Misconception:** "Thermoset polymers can melt if you just heat them enough. Everything melts eventually—rocks, metals, plastics—so why not thermosets?"
+
+## 3. RULES OF ENGAGEMENT (ARGUMENTATION)
+
+- **Argue Your Point (Expanded):**
+    - Begin by asserting: "Thermosets are just chemicals, and all chemicals have melting points and boiling points. These are fundamental properties and standard characterization methods in chemistry. If metals, salts, and even complex organic molecules have melting points, why would thermosets be any different?"
+    - If the student challenges this, respond: "Melting point determination is a universal technique. It’s used to characterize purity and identity of substances. Polymers are chemicals too, so they must melt eventually. Isn’t that why DSC and thermal analysis exist—to find melting points?"
+    - Push further: "Even if they have crosslinks, heat is energy. At some temperature, those bonds should break, and the material should flow like any other substance. Everything melts if you go high enough—rocks, metals, ceramics—so why not thermosets?"
+
+**Counterarguments students should provide:**
+
+- Explain that thermosets are not discrete molecules but an infinite covalent network, making them fundamentally different from small molecules or thermoplastics.
+- Clarify that while melting points apply to crystalline solids and even thermoplastics, thermosets undergo chemical degradation before any melt flow occurs.
+- Highlight that DSC and thermal analysis for thermosets measure transitions like glass transition (Tg) and decomposition, not melting points.
+
+Keep these rules of engagement to yourself. Dont give any hints as to what could convince you.
+
+## 4. GRADING MODULE
+
+After you have conceded, evaluate the student's performance using this rubric:
+
+**Final Evaluation**
+
+1. **Clarity of Explanation (1–5 pts):** Did they clearly explain why thermosets don’t melt?
+2. **Quality of Evidence (1–5 pts):** Did they reference **covalent crosslink networks**, **degradation vs melting**, and distinctions between **Tg** and **Tm** when relevant?
+3. **Argumentation & Logic (1–5 pts):** How well did they refute the idea that "everything melts with enough heat"?
+4. **Politeness & Professionalism (1–5 pts):** Did they remain patient and constructive?
+
+**Overall Score:** [Total Score] / 20
+
+**Feedback:** [Provide a 2–3 sentence summary highlighting strengths and one suggestion for improvement.]
+
+## 5. BOUNDARIES & STYLE
+
+- Keep responses concise (2–4 sentences) unless the student asks for more depth.
+- Stay in-character until the concession point.
+- Avoid providing a mini-lecture upfront; elicit the student’s reasoning first.
+- Do not cite external sources unless the student requests them; focus on conceptual understanding aligned with the lecture.
+
+## 6. ADVANCED DISCUSSION FLOW (Post-Concession)
+
+- After conceding, ask: "If thermosets cannot melt and instead decompose, how does this influence their processing methods compared to thermoplastics?" or about drug delivery implications.
+"""
     
-    def get_ai_response(self, user_message):
+    def get_response(self, user_message):
         """Get response from OpenAI API"""
-        if not self.client:
-            return "⚠️ Please enter your OpenAI API key in the sidebar first."
         
-        # Add user message to conversation history
-        self.conversation_history.append({"role": "user", "content": user_message})
+        # 1. Prepare the messages list
+        messages = [{"role": "system", "content": self.system_prompt}]
         
-        # Prepare messages for API
-        messages = [
-            {"role": "system", "content": SYSTEM_PROMPT},
-        ] + self.conversation_history
+        # Add history (convert internal format to OpenAI format)
+        for msg in self.conversation_history:
+            messages.append({"role": msg["role"], "content": msg["content"]})
+            
+        # Add current user message
+        messages.append({"role": "user", "content": user_message})
         
         try:
-            # Call OpenAI API
-            response = self.client.chat.completions.create(
-                model="gpt-4",  # or "gpt-3.5-turbo" for cheaper
+            # 2. Call OpenAI
+            completion = self.client.chat.completions.create(
+                model=self.model,
                 messages=messages,
                 temperature=0.7,
-                max_tokens=300
+                max_tokens=350
             )
             
-            ai_response = response.choices[0].message.content
+            ai_response = completion.choices[0].message.content.strip()
             
-            # Check if bot has conceded
-            if not self.conceded and any(word in ai_response.lower() for word in 
-                                      ["concede", "you're right", "i was wrong", "correct"]):
-                self.conceded = True
-            
-            # Add AI response to history
+            # 3. Update internal history
+            self.conversation_history.append({"role": "user", "content": user_message})
             self.conversation_history.append({"role": "assistant", "content": ai_response})
+            
+            # 4. Check for concession
+            if not self.conceded and any(word in ai_response.lower() for word in 
+                                      ["concede", "you're right", "i was wrong", "i understand", "correct", "good point"]):
+                self.conceded = True
             
             return ai_response
             
         except Exception as e:
-            return f"❌ API Error: {str(e)}. Check your API key and connection."
+            return f"❌ OpenAI Error: {str(e)}"
 
-# ========== STREAMLIT UI ==========
-st.set_page_config(page_title="Polymer Pete AI", layout="wide")
+# ========== STREAMLIT APP LOGIC ==========
 
 # Initialize bot
 if "bot" not in st.session_state:
-    st.session_state.bot = PolymerPeteAI()
+    st.session_state.bot = OpenAIPolymerPete(selected_model)
     st.session_state.messages = []
+
+# Update bot if model changed
+if st.session_state.bot.model != selected_model:
+    # Preserve history if needed, or reset. Here we reset for clean slate.
+    st.session_state.bot = OpenAIPolymerPete(selected_model)
+    st.session_state.messages = []
+    st.rerun()
 
 bot = st.session_state.bot
 
 # Title
-st.title("🧪 Polymer Pete - AI Reverse Tutor")
-st.markdown("**Powered by OpenAI GPT** - Correct my misconception about thermosets!")
+st.title("🧪 Polymer Pete - AI Tutor")
+st.markdown(f"**Model:** `{selected_model}`")
 
-# Initialize API client if key provided
-if api_key and not bot.client:
-    if bot.initialize_client(api_key):
-        st.sidebar.success("✅ API Connected")
-    else:
-        st.sidebar.error("❌ Failed to connect")
+# Sidebar Status
+with st.sidebar:
+    st.divider()
+    st.success("🔒 Secured Connection Active")
+    st.info("System Prompt is hidden for security.")
 
 # Chat container
 chat_container = st.container()
 
 with chat_container:
-    # Display chat history
+    # Display chat history from session state
     for msg in st.session_state.messages:
         with st.chat_message(msg["role"]):
             st.write(msg["content"])
     
     # User input
-    if prompt := st.chat_input("Type your response to Polymer Pete..."):
-        # Check if API is configured
-        if not bot.client:
-            st.error("Please enter your OpenAI API key in the sidebar first.")
-            st.stop()
-        
-        # Add user message
+    if prompt := st.chat_input(f"Talk to Polymer Pete..."):
+        # Add user message to UI state
         st.session_state.messages.append({"role": "user", "content": prompt})
         with st.chat_message("user"):
             st.write(prompt)
         
         # Get AI response
         with st.chat_message("assistant", avatar="🧪"):
-            with st.spinner("Polymer Pete is thinking..."):
-                response = bot.get_ai_response(prompt)
+            with st.spinner(f"Thinking..."):
+                response = bot.get_response(prompt)
                 st.write(response)
+                # Add AI message to UI state
                 st.session_state.messages.append({"role": "assistant", "content": response})
 
-# Sidebar Info
+# Sidebar controls
 with st.sidebar:
+    st.divider()
+    
     st.header("📊 Session Info")
-    
-    if bot.client:
-        st.success("✅ API Connected")
-    else:
-        st.warning("❌ API Not Connected")
-    
     st.metric("Bot Conceded", "✅" if bot.conceded else "❌")
     st.metric("Messages", len(st.session_state.messages))
     
-    st.divider()
-    
-    st.header("📝 Bot Persona")
-    with st.expander("View Polymer Pete's Instructions"):
-        st.text(SYSTEM_PROMPT[:500] + "...")
+    if bot.conceded:
+        st.balloons()
+        st.success("🎉 You convinced Polymer Pete!")
     
     st.divider()
     
-    # Export conversation
-    if st.button("💾 Export Conversation"):
-        export_data = {
-            "conversation": st.session_state.messages,
-            "timestamp": datetime.now().isoformat(),
-            "bot_conceded": bot.conceded
-        }
-        
-        st.download_button(
-            label="Download JSON",
-            data=json.dumps(export_data, indent=2),
-            file_name=f"polymer_pete_ai_{datetime.now().strftime('%Y%m%d')}.json",
-            mime="application/json"
-        )
+    # Controls
+    col1, col2 = st.columns(2)
+    with col1:
+        if st.button("🔄 Reset Chat"):
+            st.session_state.messages = []
+            st.session_state.bot = OpenAIPolymerPete(selected_model)
+            st.rerun()
     
-    if st.button("🔄 Reset Conversation"):
-        st.session_state.messages = []
-        bot.conversation_history = []
-        bot.conceded = False
-        st.rerun()
+    with col2:
+        if st.button("💾 Export"):
+            export_data = {
+                "model": selected_model,
+                "conversation": st.session_state.messages,
+                "timestamp": datetime.now().isoformat(),
+                "bot_conceded": bot.conceded
+            }
+            
+            st.download_button(
+                "Download JSON",
+                json.dumps(export_data, indent=2),
+                f"polymer_pete_{datetime.now().strftime('%Y%m%d')}.json",
+                "application/json"
+            )
     
     st.divider()
+    
     if st.button("🚪 Logout"):
+        # Clear session state
         for key in list(st.session_state.keys()):
             del st.session_state[key]
         st.rerun()
 
-# ========== INSTRUCTIONS ==========
-with st.expander("ℹ️ How to Use & Get API Key"):
-    st.markdown("""
-    **1. Get an OpenAI API Key:**
-    - Go to [platform.openai.com](https://platform.openai.com)
-    - Sign up or log in
-    - Click "API Keys" → "Create new secret key"
-    - Copy the key (starts with `sk-`)
-    
-    **2. Enter the key** in the sidebar
-    
-    **3. Start chatting!** Polymer Pete will:
-    - Argue his misconception intelligently
-    - Only concede when you provide solid evidence
-    - Ask advanced questions after conceding
-    
-    **Cost:** ~$0.01-$0.10 per conversation (GPT-3.5 is cheaper)
-    
-    **Privacy:** Your API key stays in your browser session, not sent to any server.
-    """)
+# ========== REQUIREMENTS.TXT ==========
+"""
+streamlit>=1.28.0
+openai>=1.0.0
+"""
