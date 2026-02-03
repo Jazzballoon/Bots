@@ -3,7 +3,7 @@ from openai import OpenAI
 import json
 from datetime import datetime
 import time
-import streamlit.components.v1 as components # Added for js injection
+import streamlit.components.v1 as components 
 
 # ========== CONFIGURATION & AUTHENTICATION ==========
 st.set_page_config(page_title="Polymer Pete - AI Tutor", layout="wide")
@@ -55,7 +55,7 @@ st.sidebar.header("🤖 AI Settings")
 
 MODELS = {
     "gpt-5-mini": "GPT-5 Mini (Fastest, Cheapest)",
-    "gpt-4o-mini": "GPT-4o Mini (Fallback/Alternative)" # Kept as a fallback option
+    "gpt-4o-mini": "GPT-4o Mini (Fallback/Alternative)" 
 }
 
 
@@ -67,12 +67,10 @@ selected_model = st.sidebar.selectbox(
 
 # ========== BOT CLASS ==========
 class OpenAIPolymerPete:
-    # Set default to user's requested model
     def __init__(self, model_name="gpt-5-mini"):
         self.client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
         self.model = model_name
         self.conceded = False
-        # self.conversation_history = []  <-- REMOVED. History is managed by st.session_state.messages
         
         # System prompt
         self.system_prompt = """# MISSION: REVERSE TUTOR AI - BOT (POLYMERS)
@@ -131,21 +129,19 @@ After you have conceded, evaluate the student's performance using this rubric:
 - After conceding, ask: "If thermosets cannot melt and instead decompose, how does this influence their processing methods compared to thermoplastics?" or about drug delivery implications.
 """
     
-    # MODIFIED: Accepts the full chat_history from Streamlit state
-    def get_response(self, user_message, chat_history):
+    # MODIFIED: Only accepts the full chat_history. Removed redundant user_message argument.
+    def get_response(self, chat_history):
         """Get response from OpenAI API"""
         
         # 1. Prepare the messages list (Start with System Prompt)
         messages = [{"role": "system", "content": self.system_prompt}]
         
         # 2. Add full history from Streamlit state
+        # The history already contains the last user message, which is correct for the API.
         messages.extend(chat_history)
-            
-        # 3. Add current user message (It's already in chat_history, but the prompt
-        # will contain the latest user message when called)
         
         try:
-            # 4. Call OpenAI
+            # 3. Call OpenAI
             completion = self.client.chat.completions.create(
                 model=self.model,
                 messages=messages,
@@ -155,9 +151,7 @@ After you have conceded, evaluate the student's performance using this rubric:
             
             ai_response = completion.choices[0].message.content.strip()
             
-            # 5. History update now ONLY happens in st.session_state in the main app logic
-            
-            # 6. Check for concession
+            # 4. Check for concession
             if not self.conceded and any(word in ai_response.lower() for word in 
                                       ["concede", "you're right", "i was wrong", "i understand", "correct", "good point"]):
                 self.conceded = True
@@ -172,11 +166,10 @@ After you have conceded, evaluate the student's performance using this rubric:
 # Initialize bot
 if "bot" not in st.session_state:
     st.session_state.bot = OpenAIPolymerPete(selected_model)
-    st.session_state.messages = [] # st.session_state.messages is now the SOLE source of history
+    st.session_state.messages = [] 
 
 # Update bot if model changed
 if st.session_state.bot.model != selected_model:
-    # Preserve history if needed, or reset. Here we reset for clean slate.
     st.session_state.bot = OpenAIPolymerPete(selected_model)
     st.session_state.messages = []
     st.rerun()
@@ -254,7 +247,7 @@ with chat_container:
     # 3. Handle the form submission (when the Send button is clicked AND there is a message)
     if submitted and prompt:
         
-        # Add user message to UI state
+        # Add user message to UI state (THIS IS CRITICAL FOR THE BOT TO SEE IT)
         user_message_dict = {"role": "user", "content": prompt}
         st.session_state.messages.append(user_message_dict)
         with st.chat_message("user"):
@@ -263,8 +256,8 @@ with chat_container:
         # Get AI response
         with st.chat_message("assistant", avatar="🧪"):
             with st.spinner(f"Thinking..."):
-                # Call bot, passing the current history to it
-                response = bot.get_response(prompt, st.session_state.messages) 
+                # Call bot, passing the current history (including the latest user message)
+                response = bot.get_response(st.session_state.messages) 
                 st.write(response)
                 # Add AI message to UI state
                 st.session_state.messages.append({"role": "assistant", "content": response})
