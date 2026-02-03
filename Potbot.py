@@ -51,10 +51,10 @@ if not check_password():
 # ========== OPENAI SETUP ==========
 st.sidebar.header("🤖 AI Settings")
 
-# Model selection (OpenAI Models)
+
 MODELS = {
-    "gpt-4o-mini": "GPT-4o Mini (Fastest, Cheaper)",
-}
+    "gpt-5-mini": "GPT-5 Mini (Fastest, Cheapest)",
+
 
 selected_model = st.sidebar.selectbox(
     "Choose model:",
@@ -195,18 +195,70 @@ with st.sidebar:
 # Chat container
 chat_container = st.container()
 
+# A unique key for the text area
+INPUT_KEY = "user_input_text"
+
 with chat_container:
     # Display chat history from session state
     for msg in st.session_state.messages:
         with st.chat_message(msg["role"]):
             st.write(msg["content"])
     
-    # User input
-    if prompt := st.chat_input(f"Talk to Polymer Pete..."):
+    # ===================================================================
+    # START: Custom Input Block to Block Copy-Paste (Replaces st.chat_input)
+    # ===================================================================
+    
+    # 1. Create the input area and button layout
+    col_input, col_send = st.columns([0.9, 0.1])
+    
+    with col_input:
+        # Use st.text_area instead of st.chat_input for better control/targeting
+        prompt = st.text_area(
+            "Enter your message...",
+            key=INPUT_KEY,
+            height=50,
+            label_visibility="collapsed"
+        )
+    
+    with col_send:
+        # Use st.markdown + st.button to vertically align the button
+        st.markdown("<br>", unsafe_allow_html=True) 
+        send_button = st.button("Send", key="send_message")
+
+    # 2. Inject JavaScript to disable paste on the textarea
+    # We target the textarea element that Streamlit generates
+    js_code = """
+    <script>
+        // Wait a moment for Streamlit to render the component
+        setTimeout(function() {
+            // Target the textarea element inside the component with the test ID
+            var textarea = document.querySelector('[data-testid="stTextarea"] textarea');
+            if (textarea) {
+                // Disable the 'paste' event
+                textarea.onpaste = function(e) {
+                    e.preventDefault();
+                    // Optionally alert the user
+                    alert("Copy-pasting is not allowed in this field. Please type your answer manually.");
+                    return false;
+                };
+            }
+        }, 100); // 100ms delay to ensure the DOM is ready
+    </script>
+    """
+    # Inject the HTML/JavaScript (setting height=0 makes it invisible)
+    st.components.v1.html(js_code, height=0)
+
+
+    # 3. Handle the form submission (when the Send button is clicked AND there is a message)
+    if send_button and prompt:
+        
         # Add user message to UI state
         st.session_state.messages.append({"role": "user", "content": prompt})
         with st.chat_message("user"):
             st.write(prompt)
+        
+        # IMPORTANT: Clear the input field by resetting the session state key
+        st.session_state[INPUT_KEY] = ""
         
         # Get AI response
         with st.chat_message("assistant", avatar="🧪"):
@@ -215,6 +267,13 @@ with chat_container:
                 st.write(response)
                 # Add AI message to UI state
                 st.session_state.messages.append({"role": "assistant", "content": response})
+        
+        # Rerun to clear the text area and display the new message and response
+        st.rerun()
+    elif send_button and not prompt:
+        # Optional: Handle empty message attempt
+        st.warning("Please type a message before sending.")
+
 
 # Sidebar controls
 with st.sidebar:
@@ -267,4 +326,3 @@ with st.sidebar:
 streamlit>=1.28.0
 openai>=1.0.0
 """
-
