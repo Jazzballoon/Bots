@@ -5,6 +5,9 @@ from datetime import datetime
 import time
 
 # ========== CONFIGURATION & AUTHENTICATION ==========
+# Import st.components.v1.html for JavaScript injection
+import streamlit.components.v1 as components 
+
 st.set_page_config(page_title="Polymer Pete - AI Tutor", layout="wide")
 
 # Check if secrets are set
@@ -51,9 +54,12 @@ if not check_password():
 # ========== OPENAI SETUP ==========
 st.sidebar.header("🤖 AI Settings")
 
-
+# Model selection (OpenAI Models)
+# NOTE: 'gpt-5-mini' is currently assumed to be available as per user request.
 MODELS = {
-    "gpt-5-mini": "GPT-5 Mini (Fastest, Cheapest)"}
+    "gpt-5-mini": "GPT-5 Mini (Fastest, Cheapest)", 
+    "gpt-4o-mini": "GPT-4o Mini (Fallback/Alternative)"
+}
 
 
 selected_model = st.sidebar.selectbox(
@@ -64,7 +70,8 @@ selected_model = st.sidebar.selectbox(
 
 # ========== BOT CLASS ==========
 class OpenAIPolymerPete:
-    def __init__(self, model_name="gpt-4o"):
+    # Changed default model in init to reflect the user's primary choice
+    def __init__(self, model_name="gpt-5-mini"): 
         self.client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
         self.model = model_name
         self.conceded = False
@@ -205,33 +212,36 @@ with chat_container:
             st.write(msg["content"])
     
     # ===================================================================
-    # START: Custom Input Block to Block Copy-Paste (Replaces st.chat_input)
+    # START: Custom Input Block with Form and Anti-Copy-Paste
+    # This block resolves the StreamlitAPIException by using st.form.
     # ===================================================================
     
-    # 1. Create the input area and button layout
-    col_input, col_send = st.columns([0.9, 0.1])
-    
-    with col_input:
-        # Use st.text_area instead of st.chat_input for better control/targeting
-        prompt = st.text_area(
-            "Enter your message...",
-            key=INPUT_KEY,
-            height=50,
-            label_visibility="collapsed"
-        )
-    
-    with col_send:
-        # Use st.markdown + st.button to vertically align the button
-        st.markdown("<br>", unsafe_allow_html=True) 
-        send_button = st.button("Send", key="send_message")
+    # 1. Use st.form to cleanly handle submission and automatic clearing
+    with st.form("chat_form", clear_on_submit=True):
+        col_input, col_send = st.columns([0.9, 0.1])
+        
+        with col_input:
+            # Use st.text_area for the input field
+            prompt = st.text_area(
+                "Enter your message...",
+                key=INPUT_KEY,
+                height=50,
+                label_visibility="collapsed"
+            )
+        
+        with col_send:
+            # The button to submit the form
+            st.markdown("<br>", unsafe_allow_html=True) 
+            # Use form_submit_button to submit the form
+            submitted = st.form_submit_button("Send")
 
     # 2. Inject JavaScript to disable paste on the textarea
-    # We target the textarea element that Streamlit generates
+    # NOTE: This must be outside the form so it is not re-rendered/cleared by the form submission logic
     js_code = """
     <script>
         // Wait a moment for Streamlit to render the component
         setTimeout(function() {
-            // Target the textarea element inside the component with the test ID
+            // Target the textarea element inside the component (which has the unique test ID)
             var textarea = document.querySelector('[data-testid="stTextarea"] textarea');
             if (textarea) {
                 // Disable the 'paste' event
@@ -246,19 +256,16 @@ with chat_container:
     </script>
     """
     # Inject the HTML/JavaScript (setting height=0 makes it invisible)
-    st.components.v1.html(js_code, height=0)
+    components.html(js_code, height=0)
 
 
     # 3. Handle the form submission (when the Send button is clicked AND there is a message)
-    if send_button and prompt:
+    if submitted and prompt:
         
-        # Add user message to UI state
+        # Add user message to UI state (prompt holds the value before clearing by the form)
         st.session_state.messages.append({"role": "user", "content": prompt})
         with st.chat_message("user"):
             st.write(prompt)
-        
-        # IMPORTANT: Clear the input field by resetting the session state key
-        st.session_state[INPUT_KEY] = ""
         
         # Get AI response
         with st.chat_message("assistant", avatar="🧪"):
@@ -268,11 +275,8 @@ with chat_container:
                 # Add AI message to UI state
                 st.session_state.messages.append({"role": "assistant", "content": response})
         
-        # Rerun to clear the text area and display the new message and response
-        st.rerun()
-    elif send_button and not prompt:
-        # Optional: Handle empty message attempt
-        st.warning("Please type a message before sending.")
+        # NOTE: st.form with clear_on_submit=True handles the rerun and clearing of the text area.
+        # No explicit st.session_state[INPUT_KEY] = "" or st.rerun() needed here.
 
 
 # Sidebar controls
@@ -326,4 +330,3 @@ with st.sidebar:
 streamlit>=1.28.0
 openai>=1.0.0
 """
-
