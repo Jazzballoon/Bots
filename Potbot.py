@@ -53,9 +53,9 @@ st.sidebar.header("🤖 AI Settings")
 
 # Model selection (OpenAI Models)
 MODELS = {
-    "gpt-4o": "GPT-4o (Smartest, Fast)",
-    "gpt-4o-mini": "GPT-4o Mini (Fastest, Cheaper)",
-    "gpt-3.5-turbo": "GPT-3.5 Turbo (Legacy)"
+
+    "gpt-5-mini": "GPT-5 Mini (Fastest, Cheaper)",
+
 }
 
 selected_model = st.sidebar.selectbox(
@@ -148,7 +148,7 @@ After you have conceded, evaluate the student's performance using this rubric:
             completion = self.client.chat.completions.create(
                 model=self.model,
                 messages=messages,
-                temperature=0.7,
+                #temperature=0.7,
                 max_tokens=350
             )
             
@@ -269,3 +269,4 @@ with st.sidebar:
 streamlit>=1.28.0
 openai>=1.0.0
 """
+
