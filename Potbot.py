@@ -150,7 +150,7 @@ After you have conceded, evaluate the student's performance using this rubric:
             completion = self.client.chat.completions.create(
                 model=self.model,
                 messages=messages,
-                temperature=0.7,
+                temperature=,
                 # FIX: Changed max_tokens to max_completion_tokens
                 max_completion_tokens=350 
             )
@@ -323,3 +323,4 @@ with st.sidebar:
 streamlit>=1.28.0
 openai>=1.0.0
 """
+
