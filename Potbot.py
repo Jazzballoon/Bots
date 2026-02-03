@@ -53,7 +53,7 @@ st.sidebar.header("🤖 AI Settings")
 
 
 MODELS = {
-    "gpt-5-mini": "GPT-5 Mini (Fastest, Cheapest)",
+    "gpt-5-mini": "GPT-5 Mini (Fastest, Cheapest)"}
 
 
 selected_model = st.sidebar.selectbox(
@@ -326,3 +326,4 @@ with st.sidebar:
 streamlit>=1.28.0
 openai>=1.0.0
 """
+
