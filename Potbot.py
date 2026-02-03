@@ -72,8 +72,7 @@ class OpenAIPolymerPete:
         self.client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
         self.model = model_name
         self.conceded = False
-        # We store the conversation in a specific format for OpenAI
-        self.conversation_history = [] 
+        # self.conversation_history = []  <-- REMOVED. History is managed by st.session_state.messages
         
         # System prompt
         self.system_prompt = """# MISSION: REVERSE TUTOR AI - BOT (POLYMERS)
@@ -132,35 +131,33 @@ After you have conceded, evaluate the student's performance using this rubric:
 - After conceding, ask: "If thermosets cannot melt and instead decompose, how does this influence their processing methods compared to thermoplastics?" or about drug delivery implications.
 """
     
-    def get_response(self, user_message):
+    # MODIFIED: Accepts the full chat_history from Streamlit state
+    def get_response(self, user_message, chat_history):
         """Get response from OpenAI API"""
         
-        # 1. Prepare the messages list
+        # 1. Prepare the messages list (Start with System Prompt)
         messages = [{"role": "system", "content": self.system_prompt}]
         
-        # Add history (convert internal format to OpenAI format)
-        for msg in self.conversation_history:
-            messages.append({"role": msg["role"], "content": msg["content"]})
+        # 2. Add full history from Streamlit state
+        messages.extend(chat_history)
             
-        # Add current user message
-        messages.append({"role": "user", "content": user_message})
+        # 3. Add current user message (It's already in chat_history, but the prompt
+        # will contain the latest user message when called)
         
         try:
-            # 2. Call OpenAI
+            # 4. Call OpenAI
             completion = self.client.chat.completions.create(
                 model=self.model,
                 messages=messages,
-                # FIX: Changed max_tokens to max_completion_tokens
+                # temperature=0.7, # REMOVED: Model does not support non-default temperature
                 max_completion_tokens=350 
             )
             
             ai_response = completion.choices[0].message.content.strip()
             
-            # 3. Update internal history
-            self.conversation_history.append({"role": "user", "content": user_message})
-            self.conversation_history.append({"role": "assistant", "content": ai_response})
+            # 5. History update now ONLY happens in st.session_state in the main app logic
             
-            # 4. Check for concession
+            # 6. Check for concession
             if not self.conceded and any(word in ai_response.lower() for word in 
                                       ["concede", "you're right", "i was wrong", "i understand", "correct", "good point"]):
                 self.conceded = True
@@ -175,7 +172,7 @@ After you have conceded, evaluate the student's performance using this rubric:
 # Initialize bot
 if "bot" not in st.session_state:
     st.session_state.bot = OpenAIPolymerPete(selected_model)
-    st.session_state.messages = []
+    st.session_state.messages = [] # st.session_state.messages is now the SOLE source of history
 
 # Update bot if model changed
 if st.session_state.bot.model != selected_model:
@@ -257,15 +254,17 @@ with chat_container:
     # 3. Handle the form submission (when the Send button is clicked AND there is a message)
     if submitted and prompt:
         
-        # Add user message to UI state (prompt holds the value before clearing by the form)
-        st.session_state.messages.append({"role": "user", "content": prompt})
+        # Add user message to UI state
+        user_message_dict = {"role": "user", "content": prompt}
+        st.session_state.messages.append(user_message_dict)
         with st.chat_message("user"):
             st.write(prompt)
         
         # Get AI response
         with st.chat_message("assistant", avatar="🧪"):
             with st.spinner(f"Thinking..."):
-                response = bot.get_response(prompt)
+                # Call bot, passing the current history to it
+                response = bot.get_response(prompt, st.session_state.messages) 
                 st.write(response)
                 # Add AI message to UI state
                 st.session_state.messages.append({"role": "assistant", "content": response})
@@ -322,6 +321,3 @@ with st.sidebar:
 streamlit>=1.28.0
 openai>=1.0.0
 """
-
-
-
