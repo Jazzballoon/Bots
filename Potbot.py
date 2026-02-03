@@ -149,7 +149,7 @@ After you have conceded, evaluate the student's performance using this rubric:
                 model=self.model,
                 messages=messages,
                 #temperature=0.7,
-                max_tokens=350
+                max_completion_tokens=350
             )
             
             ai_response = completion.choices[0].message.content.strip()
@@ -269,4 +269,5 @@ with st.sidebar:
 streamlit>=1.28.0
 openai>=1.0.0
 """
+
 
