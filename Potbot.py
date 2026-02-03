@@ -159,8 +159,10 @@ After you have conceded, evaluate the student's performance using this rubric:
             self.conversation_history.append({"role": "assistant", "content": ai_response})
             
             # 4. Check for concession
+            # Using a more robust check that looks for the phrase being the start of a sentence or a standalone word
             if not self.conceded and any(word in ai_response.lower() for word in 
                                       ["concede", "you're right", "i was wrong", "i understand", "correct", "good point"]):
+                # This is a basic concession check; a more advanced check would be needed for a strict rubric compliance
                 self.conceded = True
             
             return ai_response
@@ -175,12 +177,53 @@ if "bot" not in st.session_state:
     st.session_state.bot = OpenAIPolymerPete(selected_model)
     st.session_state.messages = []
 
-# Update bot if model changed
+# Update bot if model changed (and reset)
 if st.session_state.bot.model != selected_model:
     # Preserve history if needed, or reset. Here we reset for clean slate.
     st.session_state.bot = OpenAIPolymerPete(selected_model)
     st.session_state.messages = []
-    st.rerun()
+    st.rerun() # This will trigger the initial statement logic below on the next run
+
+# Logic to generate the initial statement if the chat is empty.
+# This makes the bot "speak first" on initial boot or after a reset.
+if not st.session_state.messages: 
+    
+    # Internal prompt to trigger the bot's initial argument based on its system prompt.
+    initial_trigger_prompt = "Begin the discussion by asserting your core misconception and argument to the student, as instructed in your persona."
+    
+    try:
+        # Use existing bot instance and its client directly
+        client = st.session_state.bot.client
+        model = st.session_state.bot.model
+        system_prompt = st.session_state.bot.system_prompt
+        
+        # Messages for the first call
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": initial_trigger_prompt} # This acts as the hidden trigger
+        ]
+        
+        # Use st.spinner to show the app is thinking during the first call
+        with st.spinner("Preparing AI Tutor's opening statement..."):
+            completion = client.chat.completions.create(
+                model=model,
+                messages=messages,
+            )
+        
+        initial_ai_response = completion.choices[0].message.content.strip()
+        
+        # 1. Add the exchange to the bot's internal history (essential for context in next turn)
+        st.session_state.bot.conversation_history.append({"role": "user", "content": initial_trigger_prompt})
+        st.session_state.bot.conversation_history.append({"role": "assistant", "content": initial_ai_response})
+        
+        # 2. Add ONLY the assistant's message to the display history (st.session_state.messages)
+        st.session_state.messages.append({"role": "assistant", "content": initial_ai_response})
+        
+    except Exception as e:
+        # Fallback if initial call fails
+        st.session_state.messages.append({"role": "assistant", "content": f"❌ Error during initial statement generation: {str(e)}"})
+        
+    st.rerun() # Rerun to display the newly added message immediately
 
 bot = st.session_state.bot
 
@@ -200,7 +243,7 @@ chat_container = st.container()
 with chat_container:
     # Display chat history from session state
     for msg in st.session_state.messages:
-        with st.chat_message(msg["role"]):
+        with st.chat_message(msg["role"], avatar="🧪" if msg["role"] == "assistant" else None):
             st.write(msg["content"])
     
     # User input
@@ -269,6 +312,3 @@ with st.sidebar:
 streamlit>=1.28.0
 openai>=1.0.0
 """
-
-
-
