@@ -129,15 +129,13 @@ After you have conceded, evaluate the student's performance using this rubric:
 - After conceding, ask: "If thermosets cannot melt and instead decompose, how does this influence their processing methods compared to thermoplastics?" or about drug delivery implications.
 """
     
-    # MODIFIED: Only accepts the full chat_history. Removed redundant user_message argument.
     def get_response(self, chat_history):
         """Get response from OpenAI API"""
         
         # 1. Prepare the messages list (Start with System Prompt)
         messages = [{"role": "system", "content": self.system_prompt}]
         
-        # 2. Add full history from Streamlit state
-        # The history already contains the last user message, which is correct for the API.
+        # 2. Add full history (which now includes the latest user message)
         messages.extend(chat_history)
         
         try:
@@ -247,19 +245,22 @@ with chat_container:
     # 3. Handle the form submission (when the Send button is clicked AND there is a message)
     if submitted and prompt:
         
-        # Add user message to UI state (THIS IS CRITICAL FOR THE BOT TO SEE IT)
-        user_message_dict = {"role": "user", "content": prompt}
-        st.session_state.messages.append(user_message_dict)
-        with st.chat_message("user"):
-            st.write(prompt)
+        # 3a. Create the dictionary for the LATEST user message
+        latest_user_message = {"role": "user", "content": prompt}
+
+        # 3b. Create the full API message list: Existing History + Latest User Message
+        # This list is passed to the API call. st.session_state.messages is NOT updated yet.
+        messages_for_api = st.session_state.messages + [latest_user_message]
         
-        # Get AI response
+        # 3c. Get AI response
         with st.chat_message("assistant", avatar="🧪"):
             with st.spinner(f"Thinking..."):
-                # Call bot, passing the current history (including the latest user message)
-                response = bot.get_response(st.session_state.messages) 
+                # Call bot, passing the full message list for the API
+                response = bot.get_response(messages_for_api) 
                 st.write(response)
-                # Add AI message to UI state
+                
+                # 3d. Now update the Streamlit state with BOTH messages after successful API call
+                st.session_state.messages.append(latest_user_message)
                 st.session_state.messages.append({"role": "assistant", "content": response})
 
 
