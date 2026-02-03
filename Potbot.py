@@ -3,11 +3,9 @@ from openai import OpenAI
 import json
 from datetime import datetime
 import time
+import streamlit.components.v1 as components # Added for js injection
 
 # ========== CONFIGURATION & AUTHENTICATION ==========
-# Import st.components.v1.html for JavaScript injection
-import streamlit.components.v1 as components 
-
 st.set_page_config(page_title="Polymer Pete - AI Tutor", layout="wide")
 
 # Check if secrets are set
@@ -54,11 +52,10 @@ if not check_password():
 # ========== OPENAI SETUP ==========
 st.sidebar.header("🤖 AI Settings")
 
-# Model selection (OpenAI Models)
-# NOTE: 'gpt-5-mini' is currently assumed to be available as per user request.
+
 MODELS = {
-    "gpt-5-mini": "GPT-5 Mini (Fastest, Cheapest)", 
-    "gpt-4o-mini": "GPT-4o Mini (Fallback/Alternative)"
+    "gpt-5-mini": "GPT-5 Mini (Fastest, Cheapest)",
+    "gpt-4o-mini": "GPT-4o Mini (Fallback/Alternative)" # Kept as a fallback option
 }
 
 
@@ -70,8 +67,8 @@ selected_model = st.sidebar.selectbox(
 
 # ========== BOT CLASS ==========
 class OpenAIPolymerPete:
-    # Changed default model in init to reflect the user's primary choice
-    def __init__(self, model_name="gpt-5-mini"): 
+    # Set default to user's requested model
+    def __init__(self, model_name="gpt-5-mini"):
         self.client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
         self.model = model_name
         self.conceded = False
@@ -154,7 +151,8 @@ After you have conceded, evaluate the student's performance using this rubric:
                 model=self.model,
                 messages=messages,
                 temperature=0.7,
-                max_tokens=350
+                # FIX: Changed max_tokens to max_completion_tokens
+                max_completion_tokens=350 
             )
             
             ai_response = completion.choices[0].message.content.strip()
@@ -213,7 +211,6 @@ with chat_container:
     
     # ===================================================================
     # START: Custom Input Block with Form and Anti-Copy-Paste
-    # This block resolves the StreamlitAPIException by using st.form.
     # ===================================================================
     
     # 1. Use st.form to cleanly handle submission and automatic clearing
@@ -236,7 +233,6 @@ with chat_container:
             submitted = st.form_submit_button("Send")
 
     # 2. Inject JavaScript to disable paste on the textarea
-    # NOTE: This must be outside the form so it is not re-rendered/cleared by the form submission logic
     js_code = """
     <script>
         // Wait a moment for Streamlit to render the component
@@ -274,9 +270,6 @@ with chat_container:
                 st.write(response)
                 # Add AI message to UI state
                 st.session_state.messages.append({"role": "assistant", "content": response})
-        
-        # NOTE: st.form with clear_on_submit=True handles the rerun and clearing of the text area.
-        # No explicit st.session_state[INPUT_KEY] = "" or st.rerun() needed here.
 
 
 # Sidebar controls
