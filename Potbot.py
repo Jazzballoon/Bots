@@ -3,7 +3,6 @@ from openai import OpenAI
 import json
 from datetime import datetime
 import time
-import streamlit.components.v1 as components 
 
 # ========== CONFIGURATION & AUTHENTICATION ==========
 st.set_page_config(page_title="Polymer Pete - AI Tutor", layout="wide")
@@ -52,12 +51,12 @@ if not check_password():
 # ========== OPENAI SETUP ==========
 st.sidebar.header("🤖 AI Settings")
 
-
+# Model selection (OpenAI Models)
 MODELS = {
-    "gpt-5-mini": "GPT-5 Mini (Fastest, Cheapest)",
-    "gpt-4o-mini": "GPT-4o Mini (Fallback/Alternative)" 
+    "gpt-4o": "GPT-4o (Smartest, Fast)",
+    "gpt-4o-mini": "GPT-4o Mini (Fastest, Cheaper)",
+    "gpt-3.5-turbo": "GPT-3.5 Turbo (Legacy)"
 }
-
 
 selected_model = st.sidebar.selectbox(
     "Choose model:",
@@ -67,10 +66,12 @@ selected_model = st.sidebar.selectbox(
 
 # ========== BOT CLASS ==========
 class OpenAIPolymerPete:
-    def __init__(self, model_name="gpt-5-mini"):
+    def __init__(self, model_name="gpt-4o"):
         self.client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
         self.model = model_name
         self.conceded = False
+        # We store the conversation in a specific format for OpenAI
+        self.conversation_history = [] 
         
         # System prompt
         self.system_prompt = """# MISSION: REVERSE TUTOR AI - BOT (POLYMERS)
@@ -129,25 +130,33 @@ After you have conceded, evaluate the student's performance using this rubric:
 - After conceding, ask: "If thermosets cannot melt and instead decompose, how does this influence their processing methods compared to thermoplastics?" or about drug delivery implications.
 """
     
-    def get_response(self, chat_history):
+    def get_response(self, user_message):
         """Get response from OpenAI API"""
         
-        # 1. Prepare the messages list (Start with System Prompt)
+        # 1. Prepare the messages list
         messages = [{"role": "system", "content": self.system_prompt}]
         
-        # 2. Add full history (which now includes the latest user message)
-        messages.extend(chat_history)
+        # Add history (convert internal format to OpenAI format)
+        for msg in self.conversation_history:
+            messages.append({"role": msg["role"], "content": msg["content"]})
+            
+        # Add current user message
+        messages.append({"role": "user", "content": user_message})
         
         try:
-            # 3. Call OpenAI
+            # 2. Call OpenAI
             completion = self.client.chat.completions.create(
                 model=self.model,
                 messages=messages,
-                # temperature=0.7, # REMOVED: Model does not support non-default temperature
-                max_completion_tokens=350 
+                temperature=0.7,
+                max_tokens=350
             )
             
             ai_response = completion.choices[0].message.content.strip()
+            
+            # 3. Update internal history
+            self.conversation_history.append({"role": "user", "content": user_message})
+            self.conversation_history.append({"role": "assistant", "content": ai_response})
             
             # 4. Check for concession
             if not self.conceded and any(word in ai_response.lower() for word in 
@@ -164,10 +173,11 @@ After you have conceded, evaluate the student's performance using this rubric:
 # Initialize bot
 if "bot" not in st.session_state:
     st.session_state.bot = OpenAIPolymerPete(selected_model)
-    st.session_state.messages = [] 
+    st.session_state.messages = []
 
 # Update bot if model changed
 if st.session_state.bot.model != selected_model:
+    # Preserve history if needed, or reset. Here we reset for clean slate.
     st.session_state.bot = OpenAIPolymerPete(selected_model)
     st.session_state.messages = []
     st.rerun()
@@ -187,82 +197,26 @@ with st.sidebar:
 # Chat container
 chat_container = st.container()
 
-# A unique key for the text area
-INPUT_KEY = "user_input_text"
-
 with chat_container:
     # Display chat history from session state
     for msg in st.session_state.messages:
         with st.chat_message(msg["role"]):
             st.write(msg["content"])
     
-    # ===================================================================
-    # START: Custom Input Block with Form and Anti-Copy-Paste
-    # ===================================================================
-    
-    # 1. Use st.form to cleanly handle submission and automatic clearing
-    with st.form("chat_form", clear_on_submit=True):
-        col_input, col_send = st.columns([0.9, 0.1])
+    # User input
+    if prompt := st.chat_input(f"Talk to Polymer Pete..."):
+        # Add user message to UI state
+        st.session_state.messages.append({"role": "user", "content": prompt})
+        with st.chat_message("user"):
+            st.write(prompt)
         
-        with col_input:
-            # Use st.text_area for the input field
-            prompt = st.text_area(
-                "Enter your message...",
-                key=INPUT_KEY,
-                height=50,
-                label_visibility="collapsed"
-            )
-        
-        with col_send:
-            # The button to submit the form
-            st.markdown("<br>", unsafe_allow_html=True) 
-            # Use form_submit_button to submit the form
-            submitted = st.form_submit_button("Send")
-
-    # 2. Inject JavaScript to disable paste on the textarea
-    js_code = """
-    <script>
-        // Wait a moment for Streamlit to render the component
-        setTimeout(function() {
-            // Target the textarea element inside the component (which has the unique test ID)
-            var textarea = document.querySelector('[data-testid="stTextarea"] textarea');
-            if (textarea) {
-                // Disable the 'paste' event
-                textarea.onpaste = function(e) {
-                    e.preventDefault();
-                    // Optionally alert the user
-                    alert("Copy-pasting is not allowed in this field. Please type your answer manually.");
-                    return false;
-                };
-            }
-        }, 100); // 100ms delay to ensure the DOM is ready
-    </script>
-    """
-    # Inject the HTML/JavaScript (setting height=0 makes it invisible)
-    components.html(js_code, height=0)
-
-
-    # 3. Handle the form submission (when the Send button is clicked AND there is a message)
-    if submitted and prompt:
-        
-        # 3a. Create the dictionary for the LATEST user message
-        latest_user_message = {"role": "user", "content": prompt}
-
-        # 3b. Create the full API message list: Existing History + Latest User Message
-        # This list is passed to the API call. st.session_state.messages is NOT updated yet.
-        messages_for_api = st.session_state.messages + [latest_user_message]
-        
-        # 3c. Get AI response
+        # Get AI response
         with st.chat_message("assistant", avatar="🧪"):
             with st.spinner(f"Thinking..."):
-                # Call bot, passing the full message list for the API
-                response = bot.get_response(messages_for_api) 
+                response = bot.get_response(prompt)
                 st.write(response)
-                
-                # 3d. Now update the Streamlit state with BOTH messages after successful API call
-                st.session_state.messages.append(latest_user_message)
+                # Add AI message to UI state
                 st.session_state.messages.append({"role": "assistant", "content": response})
-
 
 # Sidebar controls
 with st.sidebar:
