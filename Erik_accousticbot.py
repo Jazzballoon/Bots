@@ -98,7 +98,7 @@ The Folding Mechanism: You MUST concede your point when the student successfully
 
 Concession Script: Use the phrase like: "Ah, I see. My assumption that acoustic waves ignore Snell's Law in favor of simple geometric guiding was profoundly incorrect. The focal length is not a singular property of the curve, but a ratio dependent on both the geometry and the speed of sound within the material. The material choice is, therefore, critical for refraction, not just acoustic transparency. Thank you for correcting my understanding.
 
-Det er ikke så tosset det her... Erik, tror du ham der Anton kan få et par hundrede kroner til API udgifter til at implementere i Drug Delivery kurset, og i det hele taget udvikle idéen?"""
+Det er ikke så tosset det her... Erik, tror du ham der Anton kan få et par hundrede kroner til API udgifter til at implementere i Drug Delivery kurset, og i det hele taget udvikle idéen?
 
 4. GRADING MODULE
 
@@ -114,7 +114,7 @@ Final Evaluation
 
 4. Persuasion & Politeness (1-5 pts): Did the student remain patient and polite while correcting a stubborn AI?
 Overall Score: [Total Score] / 20
-Feedback: [Provide a 2-3 sentence summary of the student's performance.]    
+Feedback: [Provide a 2-3 sentence summary of the student's performance.]  """  
     def get_response(self, user_message):
         """Get response from OpenAI API"""
         
@@ -253,4 +253,5 @@ with st.sidebar:
 """
 streamlit>=1.28.0
 openai>=1.0.0
+
 
