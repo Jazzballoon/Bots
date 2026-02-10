@@ -5,7 +5,7 @@ from datetime import datetime
 import time
 
 # ========== CONFIGURATION & AUTHENTICATION ==========
-st.set_page_config(page_title="Polymer Pete - AI Tutor", layout="wide")
+st.set_page_config(page_title="Nat Nick", layout="wide")
 
 # Check if secrets are set
 if "OPENAI_API_KEY" not in st.secrets:
@@ -263,7 +263,7 @@ if not st.session_state.messages:
 bot = st.session_state.bot
 
 # Title
-st.title("🧪 Polymer Pete - AI Tutor")
+st.title("🧪 Natural Nick")
 st.markdown(f"**Model:** `{selected_model}`")
 
 # Sidebar Status
@@ -282,7 +282,7 @@ with chat_container:
             st.write(msg["content"])
     
     # User input
-    if prompt := st.chat_input(f"Talk to Polymer Pete..."):
+    if prompt := st.chat_input(f"Talk to Nick..."):
         # Add user message to UI state
         st.session_state.messages.append({"role": "user", "content": prompt})
         with st.chat_message("user"):
@@ -306,7 +306,7 @@ with st.sidebar:
     
     if bot.conceded:
         st.balloons()
-        st.success("🎉 You convinced Polymer Pete!")
+        st.success("🎉 You convinced Nick!")
     
     st.divider()
     
@@ -347,3 +347,4 @@ with st.sidebar:
 streamlit>=1.28.0
 openai>=1.0.0
 """
+
