@@ -1,4 +1,5 @@
 import streamlit as st
+import streamlit.components.v1 as components
 from openai import OpenAI
 import json
 from datetime import datetime
@@ -6,6 +7,56 @@ import time
 
 # ========== CONFIGURATION & AUTHENTICATION ==========
 st.set_page_config(page_title="Bench-to-bedside Bethany", layout="wide")
+# ========== CONFIGURATION & AUTHENTICATION ==========
+st.set_page_config(page_title="Bench-to-bedside Bethany", layout="wide")
+
+# ========== ANTI-CHEATING SECURITY (NO COPY/PASTE) ==========
+# 1. CSS to prevent text highlighting/selection
+st.markdown("""
+    <style>
+    /* Disable text selection globally */
+    * {
+        -webkit-user-select: none !important;
+        -moz-user-select: none !important;
+        -ms-user-select: none !important;
+        user-select: none !important;
+    }
+    
+    /* Allow the user to select their own text inside the chat input box to edit typos */
+    textarea, input {
+        -webkit-user-select: auto !important;
+        -moz-user-select: auto !important;
+        -ms-user-select: auto !important;
+        user-select: auto !important;
+    }
+    </style>
+""", unsafe_allow_html=True)
+
+# 2. JavaScript to block keyboard shortcuts (Ctrl+C, Ctrl+V) and right-click menus
+components.html("""
+    <script>
+    // Streamlit components run in an iframe, so we target the parent document
+    const parentDoc = window.parent.document;
+
+    // Block Copying
+    parentDoc.addEventListener('copy', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+    }, true);
+
+    // Block Pasting (Prevents pasting answers from ChatGPT)
+    parentDoc.addEventListener('paste', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+    }, true);
+
+    // Block Right-Click Context Menu (Hides the Copy/Paste mouse buttons)
+    parentDoc.addEventListener('contextmenu', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+    }, true);
+    </script>
+""", height=0, width=0)
 
 # Check if secrets are set
 if "OPENAI_API_KEY" not in st.secrets:
@@ -94,7 +145,7 @@ Argue Your Point (Simple & Repetitive):
 
 Start with:
 
-“The paper shows a 77-fold increase in binding in prostate cancer cells. That’s huge—this should definitely work in patients too. Cells are cells. If the nanoparticles can bind and get taken up by cancer cells in the lab, I don’t see why that would suddenly fail in the body.”
+“The paper shows a 77-fold increase in binding in prostate cancer cells. That’s huge—this should definitely work in patients too. Cells are cells. If the nanoparticles can bind and get taken up by cancer cells in the lab, I don’t see why that would suddenly fail in the body.
 
 The targeting mechanism is specific, so the body shouldn’t change that much. The biology is basically the same.”
 
@@ -331,6 +382,7 @@ with st.sidebar:
 streamlit>=1.28.0
 openai>=1.0.0
 """
+
 
 
 
