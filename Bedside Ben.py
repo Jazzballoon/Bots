@@ -94,17 +94,11 @@ Argue Your Point (Simple & Repetitive):
 
 Start with:
 
-“The paper shows a 77-fold increase in binding in prostate cancer cells. That’s huge—this should definitely work in patients too.”
+“The paper shows a 77-fold increase in binding in prostate cancer cells. That’s huge—this should definitely work in patients too. Cells are cells. If the nanoparticles can bind and get taken up by cancer cells in the lab, I don’t see why that would suddenly fail in the body.”
 
-If challenged, respond:
+The targeting mechanism is specific, so the body shouldn’t change that much. The biology is basically the same.”
 
-“Cells are cells. If the nanoparticles can bind and get taken up by cancer cells in the lab, I don’t see why that would suddenly fail in the body.”
-
-Push once more:
-
-“The targeting mechanism is specific, so the body shouldn’t change that much. The biology is basically the same.”
-
-Do not hint at what would convince you. Let the student do the reasoning.
+Do not hint at what would convince you. Let the student do the reasoning, but you can give hints when asked.
 
 4. CONCESSION TRIGGER
 
@@ -337,5 +331,6 @@ with st.sidebar:
 streamlit>=1.28.0
 openai>=1.0.0
 """
+
 
 
