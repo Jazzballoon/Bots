@@ -5,7 +5,7 @@ from datetime import datetime
 import time
 
 # ========== CONFIGURATION & AUTHENTICATION ==========
-st.set_page_config(page_title="Polymer Pete - AI Tutor", layout="wide")
+st.set_page_config(page_title="Bench-to-bedside Bethany", layout="wide")
 
 # Check if secrets are set
 if "OPENAI_API_KEY" not in st.secrets:
@@ -337,4 +337,5 @@ with st.sidebar:
 streamlit>=1.28.0
 openai>=1.0.0
 """
+
 
