@@ -266,7 +266,7 @@ with chat_container:
             st.write(msg["content"])
     
     # User input
-    if prompt := st.chat_input(f"Talk to Polymer Pete..."):
+    if prompt := st.chat_input(f"Talk to Bethany"):
         # Add user message to UI state
         st.session_state.messages.append({"role": "user", "content": prompt})
         with st.chat_message("user"):
@@ -331,6 +331,7 @@ with st.sidebar:
 streamlit>=1.28.0
 openai>=1.0.0
 """
+
 
 
 
