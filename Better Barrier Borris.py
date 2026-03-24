@@ -440,8 +440,8 @@ def build_html_export(messages, scores, model, hints_used, scenario_key):
 
 # ========== SESSION INIT ==========
 MODELS = {
-    "gpt-4o":      "GPT-4o (Recommended)",
-    "gpt-4o-mini": "GPT-4o Mini (Faster)",
+    
+    "gpt-4o-mini": "GPT-4o Mini (Faster)"
 }
 
 with st.sidebar:
